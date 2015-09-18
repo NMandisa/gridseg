@@ -140,10 +140,13 @@ public class GridSeg {
 	 *            number of grid divisions per dimension
 	 * @param threshold
 	 *            minimum number of points for a cell to be relevant
+	 *            
+	 * @param minpts
+	 * 			  minimum number of points for a cluster to be relevant
 	 * 
 	 * @return cluster labels
 	 */
-	public static int[] gridseg(double[][] data, int nbreaks, int threshold) {
+	public static int[] gridseg(double[][] data, int nbreaks, int threshold, int minpts) {
 
 		int N = data.length;
 		int m = data[0].length;
@@ -167,8 +170,6 @@ public class GridSeg {
 
 		double[] breaksX = MyUtils.computeBreaks(minX, maxX, nbreaks);
 		double[] breaksY = MyUtils.computeBreaks(minY, maxY, nbreaks);
-		
-		
 
 		HashMap<Point, List<Integer>> gridmap = new HashMap<Point, List<Integer>>();
 		for (int i = 0; i <= nbreaks; i++)
@@ -230,7 +231,21 @@ public class GridSeg {
 				}
 			}
 		}
+		
+		// ***************************************************
+		// 3rd step - remove outliers
+		// ***************************************************
 
+		// we consider as outliers cells that are relevant but have no
+		// other adjoining relevant cells.
+		for (int i = 0; i <= nbreaks; i++) {
+			for (int j = 0; j <= nbreaks; j++) {
+				if(!hasRelevantNeighbor(i, j, counts, threshold))
+					lbls[i][j] = 0;
+			}
+		}
+		
+		
 		if (DEBUG) {
 			System.out.println("Labels matrix:");
 			MyUtils.print_matrix(lbls);
@@ -248,6 +263,25 @@ public class GridSeg {
 					labels[pt] = _lbl;
 			}
 		
+		// normalize labels as follows:
+		// 0 - noise
+		// 1 - first cluster
+		// 2 - second cluster, etc.
+		
+		HashSet<Integer> uclusters = MyUtils.getUniqueElements(labels);
+		int[] newlbls = new int[labels.length];
+		Object[] ucl = uclusters.toArray();
+		K = 0;
+		for (int i = 0 ; i < ucl.length; i++) {
+			int cl = (int) ucl[i];
+			if (cl == 0) continue;
+			K++;
+			for (int j = 0; j < newlbls.length; j++)
+				if(labels[j] == cl)
+					newlbls[j] = K;
+		}
+		labels = newlbls;
+		
 		if (GUIDEBUG) {
 			plotMain(data, labels);
 			plotBreaks(breaksX, breaksY, minX, maxX, minY, maxY);
@@ -255,8 +289,33 @@ public class GridSeg {
 		
 		return labels;
 	}
-
 	
+	private static boolean hasRelevantNeighbor(int x, int y, int[][] counts, double threshold) {
+		
+		int N = counts.length;
+
+		final int[] offs = new int[] { -1, 0, 1 }; // offsets
+		int nx, ny; // neighbor x and y coordinates
+
+		for (int xo : offs) {
+			for (int yo : offs) {
+
+				if (xo == 0 && yo == 0)
+					continue;
+
+				nx = x + xo;
+				ny = y + yo;
+
+				if (nx < 0 || ny < 0 || nx >= N || ny >= N)
+					continue;
+				
+				if (counts[nx][ny] >= threshold)
+					return true;
+			}
+		}
+
+		return false;
+	}	
 
 	private static ArrayDeque<Point> getRelevantNeighborsList(int x, int y, int[][] counts, boolean[][] visited, double threshold) {
 		ArrayDeque<Point> neigh = new ArrayDeque<Point>();
@@ -326,7 +385,7 @@ public class GridSeg {
 				data[i][j] = Double.parseDouble(r.get(j));
 		}
 
-		int[] labels = gridseg(data, 35, 3);
+		int[] labels = gridseg(data, 35, 3, 10);
 		System.out.println("final partition:");
 		MyUtils.print_array(labels);
 	}
