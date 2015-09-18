@@ -12,7 +12,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -104,7 +103,7 @@ public class GridSeg {
 		// create chart:
 		chart = ChartFactory.createXYLineChart("Plot", "x", "y", dataset);
 		
-		XYPlot xypl = chart.getXYPlot();		
+		XYPlot xypl = chart.getXYPlot();
 		xypl.setDomainGridlinesVisible(false);
 		xypl.setRangeGridlinesVisible(false);
 		NumberAxis na = (NumberAxis) xypl.getRangeAxis();
@@ -238,17 +237,12 @@ public class GridSeg {
 
 		// we consider as outliers cells that are relevant but have no
 		// other adjoining relevant cells.
+		
 		for (int i = 0; i <= nbreaks; i++) {
 			for (int j = 0; j <= nbreaks; j++) {
 				if(!hasRelevantNeighbor(i, j, counts, threshold))
 					lbls[i][j] = 0;
 			}
-		}
-		
-		
-		if (DEBUG) {
-			System.out.println("Labels matrix:");
-			MyUtils.print_matrix(lbls);
 		}
 		
 		// now actually assign the labels obtained:
@@ -262,6 +256,17 @@ public class GridSeg {
 				for (int pt : pts)
 					labels[pt] = _lbl;
 			}
+		
+		// we also consider as outliers clusters that have less than
+		// minpts
+		HashMap<Integer, Integer> ccounts = MyUtils.computeNumberOfOccurrences(labels);
+		for (int i = 0; i < labels.length; i++) {
+			int l = labels[i];
+			if (l == 0) continue;
+			if (ccounts.get(l) < minpts)
+				labels[i] = 0;
+		}
+				
 		
 		// normalize labels as follows:
 		// 0 - noise
