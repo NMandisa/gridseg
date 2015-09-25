@@ -36,8 +36,8 @@ import br.fapesp.myutils.MyUtils;
 
 public class GridSeg {
 
-	private static final boolean DEBUG = true;
-	private static final boolean GUIDEBUG = true;
+	private static final boolean DEBUG = false;
+	private static final boolean GUIDEBUG = false;
 	
 	private static JFreeChart chart;
 	private static ChartFrame frame;
@@ -137,15 +137,13 @@ public class GridSeg {
 	 *            examples, one per row
 	 * @param nbreaks
 	 *            number of grid divisions per dimension
-	 * @param threshold
-	 *            minimum number of points for a cell to be relevant
 	 *            
 	 * @param minpts
-	 * 			  minimum number of points for a cluster to be relevant
+	 * 			minimum number of points for a cluster to be regarded as relevant
 	 * 
 	 * @return cluster labels
 	 */
-	public static int[] gridseg(double[][] data, int nbreaks, int threshold, int minpts) {
+	public static int[] gridseg(double[][] data, int nbreaks, int minpts) {
 
 		int N = data.length;
 		int m = data[0].length;
@@ -154,6 +152,8 @@ public class GridSeg {
 
 		if (m != 2)
 			throw new RuntimeException("Impl only for 2d data!");
+		
+		int threshold = Integer.MAX_VALUE;
 
 		RealMatrix rm = new Array2DRowRealMatrix(data);
 
@@ -196,10 +196,23 @@ public class GridSeg {
 			counts[gridY][gridX]++;
 		}
 
-		if (DEBUG) {
-			System.out.println("Counts matrix:");
-			MyUtils.print_matrix(counts);
-		}
+//		if (DEBUG) {
+//			System.out.println("Counts matrix:");
+//			MyUtils.print_matrix(counts);
+//		}
+		
+		// determine the mean number of points in all cells:
+		DescriptiveStatistics cellstats = new DescriptiveStatistics();
+		for (int i = 0; i <= nbreaks; i++)
+			for (int j = 0; j <= nbreaks; j++)
+				cellstats.addValue(counts[i][j]);
+		
+		// set threshold:
+		threshold = (int) Math.ceil(cellstats.getMean() + cellstats.getStandardDeviation());
+		
+		if (DEBUG)
+			System.out.println("Using threshold = " + threshold);
+		
 
 		// ***************************************************
 		// 2nd step - place labels and merge neighbors
@@ -260,6 +273,14 @@ public class GridSeg {
 		// we also consider as outliers clusters that have less than
 		// minpts
 		HashMap<Integer, Integer> ccounts = MyUtils.computeNumberOfOccurrences(labels);
+		
+		DescriptiveStatistics clusterstats = new DescriptiveStatistics();
+		for (int val : ccounts.values())
+			clusterstats.addValue(val);
+		
+		if (DEBUG)
+			System.out.println("Using minpts = " + minpts);
+		
 		for (int i = 0; i < labels.length; i++) {
 			int l = labels[i];
 			if (l == 0) continue;
@@ -390,7 +411,7 @@ public class GridSeg {
 				data[i][j] = Double.parseDouble(r.get(j));
 		}
 
-		int[] labels = gridseg(data, 35, 3, 10);
+		int[] labels = gridseg(data, 35, 50);
 		System.out.println("final partition:");
 		MyUtils.print_array(labels);
 	}
